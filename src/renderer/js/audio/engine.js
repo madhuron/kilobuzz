@@ -223,13 +223,15 @@ export class AudioEngine {
     const send = chain(this.spaceIn, hp(250), lp(8000));
 
     // реверберация: три размера, переключаются громкостью (без пересоздания узлов)
+    // makeup — выравнивание уровня: нормализованная свёртка «размазывает» энергию во времени и звучит
+    // на 10–18 дБ тише сухого звука; с поправкой «мокрый» сигнал на 100% ≈ −3 дБ от музыки (как в модуле Windows)
     this.rev = {};
-    for (const [name, sec, pre, damp] of [['room', 0.45, 8, 7000], ['hall', 1.9, 25, 6000], ['stadium', 3.8, 60, 4500]]) {
+    for (const [name, sec, pre, damp, makeup] of [['room', 0.45, 8, 7000, 14.7], ['hall', 1.9, 25, 6000, 8.9], ['stadium', 3.8, 60, 4500, 7.2]]) {
       const conv = c.createConvolver();
       conv.normalize = true;
       conv.buffer = this._roomIR(sec, pre);
       const out = g(0);
-      chain(conv, lp(damp), out, this.wetBus);
+      chain(conv, lp(damp), out, g(10 ** (makeup / 20)), this.wetBus);
       this._manage(send, conv, out);
       this.rev[name] = out;
     }
@@ -244,7 +246,7 @@ export class AudioEngine {
     const dampL = lp(5000), dampR = lp(4500);
     chain(this.dlyL, dampL); dampL.connect(merge, 0, 0); dampL.connect(this.dlyR);
     chain(this.dlyR, dampR); dampR.connect(merge, 0, 1); chain(dampR, this.dlyFb, this.dlyL);
-    this.dlyOut = g(1);
+    this.dlyOut = g(10 ** (4 / 20));  // выравнивание уровня, как у реверберации
     chain(merge, this.dlyOut, this.wetBus);
   }
 
@@ -275,7 +277,7 @@ export class AudioEngine {
     if (e) e.target = v;
   }
 
-  /** reverb 0..1, size 'room'|'hall'|'stadium', delay 0..1, delayMs, feedback 0..0.8 */
+  /** reverb 0..1, size 'room'|'hall'|'stadium', delay 0..1 (уже со шкалой по слуху), delayMs, feedback 0..0.8 */
   setSpace({ reverb = 0, size = 'room', delay = 0, delayMs = 250, feedback = 0.3, duck = 0 }) {
     this._spaceDuck = duck;
     this.ducker.port.postMessage({ depth: duck });

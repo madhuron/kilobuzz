@@ -1481,11 +1481,16 @@ setInterval(() => {
   const sur = { mode: state.power ? settings.surround : 'off', amount: settings.surroundAmount, device: settings.surroundDevice };
   const surKey = JSON.stringify(sur);
   if (surKey !== state.surKey) { state.surKey = surKey; engine.setSurround(sur); }
-  // Пространство: «Простор» (макро) масштабирует реверберацию и дилей; дилей привязан к темпу трека
-  const sp = settings.space / 0.3;
+  // Пространство: ползунки блока «Пространство» действуют сами по себе, «Простор» (простой режим) добавляет
+  // объёма сверху. Раньше «Простор» умножал их — при «Просторе» 0 реверберация и дилей молчали совсем.
+  // Дилей привязан к темпу трека.
+  // Шкала по слуху (x^1.5) от процентов на ползунке (реверберация хранится 0…0.4, дилей 0…0.3):
+  // 15% по умолчанию — едва заметный воздух (≈ −28 дБ от музыки), 35% — явная реверберация (≈ −17 дБ),
+  // 100% — очень «мокро» (≈ −3 дБ). «Простор» добавляет до 60% реверберации и 30% дилея.
+  const sp = settings.space || 0, taper = (x) => Math.min(1, Math.max(0, x)) ** 1.5;
   const beat = tempo.bpm && tempo.regularity > 0.12 ? 60000 / tempo.bpm : 480;
   const space = state.power
-    ? { reverb: Math.min(0.45, settings.reverb * sp), size: settings.reverbSize, delay: Math.min(0.35, settings.delay * sp), delayMs: Math.min(1500, beat * settings.delayNote), feedback: settings.delayFeedback, duck: settings.spaceDuck ?? 0.7 }
+    ? { reverb: taper(settings.reverb / 0.4 + 0.6 * sp), size: settings.reverbSize, delay: taper(settings.delay / 0.3 + 0.3 * sp), delayMs: Math.min(1500, beat * settings.delayNote), feedback: settings.delayFeedback, duck: settings.spaceDuck ?? 0.7 }
     : { reverb: 0, delay: 0 };
   const spKey = JSON.stringify(space, (k, v) => (typeof v === 'number' ? Math.round(v * 100) / 100 : v));
   if (spKey !== state.spKey) { state.spKey = spKey; engine.setSpace(space); }

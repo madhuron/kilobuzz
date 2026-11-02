@@ -342,24 +342,28 @@ struct Chain {
     float g[3] = {p[P_REV_ROOM], p[P_REV_HALL], p[P_REV_STADIUM]}, ds = p[P_DLY_SEND], fb = fminf(0.8f, p[P_DLY_FB]);
     if (g[0] < 1e-4f && g[1] < 1e-4f && g[2] < 1e-4f && ds < 1e-4f) return;
     float dSamp = fmaxf(1.f, p[P_DLY_MS] * 0.001f * sr);
-    const float dkAtt = 1 - coefMs(5, sr), dkRel = 1 - coefMs(250, sr), dkAvg = 1 - coefMs(2000, sr);
+    const float dkAtt = 1 - coefMs(10, sr), dkRel = 1 - coefMs(250, sr), dkAvg = 1 - coefMs(2000, sr);
+    // выравнивание уровня: на 100% «мокрый» сигнал ≈ −3 дБ от музыки (как в приложении)
+    static const float mk[3] = {db2lin(6.6f), db2lin(4.0f), db2lin(2.6f)};
+    const float mkD = db2lin(9.3f);
     for (int i = 0; i < n; i++) {
       float sl = spSendLp[0].run(0, spSendHp[0].run(0, L[i])), sr2 = spSendLp[1].run(0, spSendHp[1].run(0, R[i]));
       float mono = (sl + sr2) * 0.5f, oL = 0, oR = 0;
       // ducking: пока звучит музыка (удары, вокал), хвосты тише; в паузах проявляются — объём без каши
-      float dry = 0.5f * fabsf(L[i] + R[i]);
+      // приглушаются только моменты громче обычного (огибающая мощности против среднего за 2 с)
+      float m = 0.5f * (L[i] + R[i]), dry = m * m;
       dkEnv += (dry > dkEnv ? dkAtt : dkRel) * (dry - dkEnv);
       dkRef += dkAvg * (dkEnv - dkRef);
-      float over = fminf(1.f, fmaxf(0.f, (dkEnv / (dkRef + 1e-6f) - 0.6f) / 1.2f));
+      float over = fminf(1.f, fmaxf(0.f, sqrtf(dkEnv / (dkRef + 1e-12f)) - 1.1f));
       dkG += 0.002f * (db2lin(-12.f * p[P_SPACE_DUCK] * over) - dkG);
-      for (int k = 0; k < 3; k++) if (g[k] > 1e-4f) { float a, b; rev[k].run(mono, a, b); oL += revLp[k][0].run(0, a) * g[k]; oR += revLp[k][1].run(0, b) * g[k]; }
+      for (int k = 0; k < 3; k++) if (g[k] > 1e-4f) { float a, b; rev[k].run(mono, a, b); oL += revLp[k][0].run(0, a) * g[k] * mk[k]; oR += revLp[k][1].run(0, b) * g[k] * mk[k]; }
       // пинг-понг: левый → правый → обратно в левый
       float inL = mono * ds + dRout * fb;
       dL.push(inL);
       float outL = dLlp.run(0, dL.tap(dSamp));
       dR.push(outL);
       dRout = dRlp.run(0, dR.tap(dSamp));
-      L[i] += (oL + outL) * dkG; R[i] += (oR + dRout) * dkG;
+      L[i] += (oL + outL * mkD) * dkG; R[i] += (oR + dRout * mkD) * dkG;
     }
   }
 

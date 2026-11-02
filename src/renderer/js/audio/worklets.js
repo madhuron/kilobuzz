@@ -531,7 +531,7 @@ class DuckerProcessor extends AudioWorkletProcessor {
     super();
     this.p = { depth: 0 }; this.env = 0; this.ref = 0; this.g = 1;
     const t = (ms) => 1 - Math.exp(-1 / (ms * 0.001 * sampleRate));
-    this.aA = t(5); this.aR = t(250); this.aAvg = t(2000);
+    this.aA = t(10); this.aR = t(250); this.aAvg = t(2000);
     this.port.onmessage = (e) => Object.assign(this.p, e.data);
   }
   process(inputs, outputs) {
@@ -540,10 +540,12 @@ class DuckerProcessor extends AudioWorkletProcessor {
     if (!wet || !wet.length) { oL.fill(0); oR.fill(0); return true; }
     const wL = wet[0], wR = wet[1] || wet[0], dL = dry && dry[0], dR = dry && (dry[1] || dry[0]);
     for (let i = 0; i < wL.length; i++) {
-      const d = dL ? 0.5 * Math.abs(dL[i] + dR[i]) : 0;
+      // огибающая мощности сухого звука против её среднего за 2 с: приглушаются только моменты громче
+      // обычного (удар, вступление вокала), а ровно звучащая музыка хвосты не глушит
+      const m = dL ? 0.5 * (dL[i] + dR[i]) : 0, d = m * m;
       this.env += (d > this.env ? this.aA : this.aR) * (d - this.env);
       this.ref += this.aAvg * (this.env - this.ref);
-      const over = Math.min(1, Math.max(0, (this.env / (this.ref + 1e-6) - 0.6) / 1.2));
+      const over = Math.min(1, Math.max(0, Math.sqrt(this.env / (this.ref + 1e-12)) - 1.1));
       this.g += 0.002 * (db2lin(-12 * this.p.depth * over) - this.g);
       oL[i] = wL[i] * this.g; oR[i] = wR[i] * this.g;
     }
