@@ -12,7 +12,21 @@ permissions:
   contents: write
 
 jobs:
+  # Релиз создаётся один раз заранее — иначе сборки Mac и Windows, закончив одновременно,
+  # создают каждая свой релиз с одной и той же версией.
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Создать релиз
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "Kilobuzz ${TAG#v}" --notes "Сборка идёт…"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+
   mac:
+    needs: release
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +43,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   windows:
+    needs: release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
