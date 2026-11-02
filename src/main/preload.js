@@ -1,0 +1,41 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+// MessagePort с PCM нельзя передать через contextBridge — пересылаем его в страницу через window.postMessage.
+ipcRenderer.on('capture:port', (e) => window.postMessage('kilobuzz:capture-port', '*', e.ports));
+
+contextBridge.exposeInMainWorld('kilobuzz', {
+  platform: process.platform,
+  updateState: () => ipcRenderer.invoke('update:state'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateState: (cb) => ipcRenderer.on('update:state', (_e, s) => cb(s)),
+  onNowPlaying: (cb) => ipcRenderer.on('nowplaying', (_e, info) => cb(info)),
+  setNowPlayingEnabled: (on) => ipcRenderer.send('nowplaying:enable', !!on),
+  lookupGenre: (artist, title) => ipcRenderer.invoke('genre:lookup', { artist, title }),
+  requestMic: () => ipcRenderer.invoke('media:request'),
+  openExternal: (url) => ipcRenderer.send('open-external', url),
+  captureSupported: () => ipcRenderer.invoke('capture:supported'),
+  startCapture: () => ipcRenderer.invoke('capture:start'),
+  stopCapture: () => ipcRenderer.invoke('capture:stop'),
+  sendApoParams: (buf) => ipcRenderer.send('capture:params', buf),
+  apoStatus: () => ipcRenderer.invoke('apo:status'),
+  apoInstall: () => ipcRenderer.invoke('apo:install'),
+  apoUninstall: () => ipcRenderer.invoke('apo:uninstall'),
+  apoDiag: () => ipcRenderer.invoke('apo:diag'),
+  apoDiagFull: () => ipcRenderer.invoke('apo:diagFull'),
+  copyText: (t) => ipcRenderer.invoke('clipboard:write', t),
+  saveDiagnostics: (t) => ipcRenderer.invoke('diag:save', t),
+  apoCompat: () => ipcRenderer.invoke('apo:compat'),
+  onCaptureStatus: (cb) => ipcRenderer.on('capture:status', (_e, s) => cb(s)),
+  getSystemVolume: () => ipcRenderer.invoke('volume:get'),
+  setSystemVolume: (v) => ipcRenderer.invoke('volume:set', v),
+  onSystemVolume: (cb) => ipcRenderer.on('volume', (_e, v) => cb(v)),
+  setPlaybackActive: (on) => ipcRenderer.send('playback:active', on),
+  audioDevices: () => ipcRenderer.invoke('audio:devices'),
+  setDeviceRate: (uid, rate) => ipcRenderer.invoke('audio:setRate', { uid, rate }),
+  playerCommand: (cmd, value) => ipcRenderer.invoke('player:command', { cmd, value }),
+  getArtwork: (info) => ipcRenderer.invoke('artwork:get', info),
+  searchHeadphones: (q) => ipcRenderer.invoke('autoeq:search', q),
+  loadHeadphoneEq: (p) => ipcRenderer.invoke('autoeq:load', p),
+  loadHeadphoneFr: (p) => ipcRenderer.invoke('autoeq:fr', p),
+});

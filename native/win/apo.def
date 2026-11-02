@@ -1,0 +1,5 @@
+LIBRARY KilobuzzAPO
+EXPORTS
+  DllGetClassObject PRIVATE
+  DllCanUnloadNow PRIVATE
+  KbStatusBlock DATA

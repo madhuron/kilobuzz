@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' blob:; worker-src 'self' blob:">
+  <title>Kilobuzz</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="titlebar">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><g><rect x="6.5" y="13" width="2.6" height="6" rx="1.3"/><rect x="10.5" y="9" width="2.6" height="14" rx="1.3"/><rect x="14.7" y="11" width="2.6" height="10" rx="1.3"/><rect x="18.9" y="7.5" width="2.6" height="17" rx="1.3"/><rect x="23" y="12.5" width="2.6" height="7" rx="1.3"/></g></svg>
+        <span>Kilobuzz</span>
+      </div>
+      <div class="seg no-drag" id="modeSeg" role="tablist">
+        <button data-mode="player" class="on">Плеер</button>
+        <button data-mode="system">Системный звук</button>
+      </div>
+      <div class="title-right no-drag">
+        <div class="seg sm" id="uiModeSeg" title="Простой — несколько понятных ручек; расширенный — все настройки"><button type="button" data-v="simple">Простой</button><button type="button" data-v="advanced">Расширенный</button></div>
+        <label class="toggle adv" title="Подстройка под стиль и секцию трека"><input type="checkbox" id="adaptiveToggle" checked><span></span>Адаптивно</label>
+        <select id="presetSel" class="sm" title="Пресеты звучания"></select>
+        <label class="toggle master" title="Все эффекты вкл/выкл — сравнение с оригиналом (B)"><input type="checkbox" id="fxMaster" checked><span></span><b id="fxMasterLbl">Эффекты</b></label>
+        <button class="btn icon square" id="settingsBtn" title="Настройки оформления">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <aside class="col left">
+      <section class="panel">
+        <header class="panel-h"><h3>Источник</h3></header>
+        <div id="playerSource">
+          <label class="drop" id="dropZone">
+            <input type="file" id="fileInput" accept="audio/*" multiple hidden>
+            <b>Добавить треки</b><small>Перетащите файлы сюда или нажмите</small>
+          </label>
+          <ol class="playlist" id="playlist"></ol>
+        </div>
+        <div id="systemSource" hidden>
+          <div class="status-row"><i class="dot" id="capDot"></i><span id="capText">Остановлено</span></div>
+          <div id="cableBlock" hidden>
+            <label class="field"><span>Виртуальный кабель</span><select id="inSelect"></select></label>
+          </div>
+          <button class="btn primary wide" id="sysStart">Начать обработку</button>
+          <p class="hint" id="sysHint"></p>
+        </div>
+      </section>
+
+      <section class="panel np">
+        <div class="art" id="art"><span id="artText">♪</span><img id="artImg" alt="" hidden></div>
+        <div class="np-meta">
+          <span class="caption" id="npApp">—</span>
+          <b id="npTitle">Ничего не играет</b>
+          <span class="muted" id="npArtist"></span>
+        </div>
+      </section>
+
+      <section class="panel grow adv">
+        <header class="panel-h"><h3>Стиль</h3><select id="genreLock" class="sm"><option value="">Авто</option></select></header>
+        <div class="bars" id="genreBars"></div>
+        <div class="tags" id="genreTags"></div>
+      </section>
+    </aside>
+
+    <main class="col center">
+      <section class="panel hero">
+        <div class="hero-top">
+          <div>
+            <span class="caption">Секция</span>
+            <h1><i class="sec-dot" id="secDot"></i><span id="sectionName">—</span></h1>
+            <span class="muted" id="sectionSub">Включите трек — анализ начнётся автоматически</span>
+          </div>
+          <dl class="stats">
+            <div><dt>Темп</dt><dd id="statBpm">—</dd></div>
+            <div><dt>Вокал</dt><dd id="statVocal">—</dd></div>
+            <div><dt>Энергия</dt><dd id="statEnergy">—</dd></div>
+            <div><dt>Далее</dt><dd id="statNext">—</dd></div>
+          </dl>
+        </div>
+        <div class="viz">
+          <canvas id="spectrum"></canvas>
+          <div class="viz-legend"><span><i class="l-eq"></i>Адаптивный EQ</span><span><i class="l-corr"></i>Коррекция наушников</span></div>
+        </div>
+        <div class="tl-wrap"><canvas id="timeline"></canvas><div class="tl-status" id="tlStatus"></div></div>
+        <div class="legend" id="legend"></div>
+      </section>
+
+      <section class="panel eqcard adv">
+        <header class="panel-h">
+          <h3>Эквалайзер <small>заливка — автоподстройка, ползунок — ваша правка</small></h3>
+          <div class="row">
+            <select id="eqPresetSel" class="sm" title="Пресеты эквалайзера (ваши правки поверх автоподстройки)"></select>
+            <select id="sectionLock" class="sm"><option value="">Секция: авто</option></select>
+            <button class="btn sm reset" data-reset="manualEq" title="Сбросить ручные правки">↺</button>
+          </div>
+        </header>
+        <div class="auto-line"><span class="caption">Автобаланс</span><span id="balanceSummary" class="muted">—</span></div>
+        <div class="eq" id="eq"></div>
+      </section>
+    </main>
+
+    <aside class="col right">
+      <section class="panel">
+        <header class="panel-h"><h3>Ваше устройство</h3><label class="toggle sm" title="Выравнивание АЧХ устройства"><input type="checkbox" id="corrToggle"><span></span></label></header>
+        <label class="field adv"><span>Устройство вывода</span><select id="outSelect"></select></label>
+        <div class="corr-current" id="corrCurrent">Устройство не выбрано</div>
+        <div class="fr-wrap" id="frWrap" hidden>
+          <canvas id="frChart"></canvas>
+          <div class="fr-legend"><span><i class="l-raw"></i>устройство как есть</span><span><i class="l-fix"></i>после Kilobuzz</span><span><i class="l-tgt"></i>нейтрально</span></div>
+        </div>
+        <div id="corrStrengthBox" class="adv"></div>
+        <div class="suggest" id="corrSuggest" hidden></div>
+        <div class="search">
+          <input type="search" id="corrSearch" placeholder="Модель наушников, напр. Sony WH-1000XM5" autocomplete="off" spellcheck="false">
+          <ul class="results" id="corrResults" hidden></ul>
+        </div>
+        <label class="field"><span>Нет вашей модели? Выберите тип</span><select id="devType"></select></label>
+        <div class="row between adv">
+          <small class="muted">База AutoEq · ~5000 моделей</small>
+          <label class="btn sm">Импорт .txt<input type="file" id="corrImport" accept=".txt" hidden></label>
+        </div>
+      </section>
+
+      <section class="panel simple-only" id="simplePanel">
+        <header class="panel-h"><h3>Звук</h3><button class="btn sm reset" data-reset="juice,bass,space,clarity" title="Сбросить">↺</button></header>
+        <div class="chips" id="presetChips"></div>
+        <div id="simpleSliders"></div>
+      </section>
+
+      <section class="panel adv">
+        <header class="panel-h"><h3>Пространство</h3><button class="btn sm reset" data-reset="reverb,reverbSize,delay,delayFeedback,delayNote" title="Сбросить блок">↺</button></header>
+        <div class="seg sm full" id="revSizeSeg"><button type="button" data-v="room">Комната</button><button type="button" data-v="hall">Зал</button><button type="button" data-v="stadium">Стадион</button></div>
+        <div id="spaceBox"></div>
+      </section>
+
+      <section class="panel adv">
+        <header class="panel-h"><h3>Объём</h3><button class="btn sm reset" data-reset="surround,surroundAmount,surroundDevice" title="Сбросить блок">↺</button></header>
+        <div class="seg sm full" id="surSeg"><button type="button" data-v="off">Стерео</button><button type="button" data-v="5.1">5.1</button><button type="button" data-v="7.1">7.1</button></div>
+        <div class="seg sm full" id="surDevSeg"><button type="button" data-v="headphones">Для наушников</button><button type="button" data-v="speakers">Для колонок</button></div>
+        <div id="surAmountBox"></div>
+      </section>
+
+      <section class="panel adv">
+        <header class="panel-h"><h3>Обработка</h3><button class="btn sm reset" data-reset="fxAll" title="Сбросить блок">↺</button></header>
+        <div class="fx" id="fxList"></div>
+      </section>
+
+      <section class="panel adv">
+        <header class="panel-h"><h3>Выход</h3><button class="btn sm reset" data-reset="autoLevel,loudComp" title="Сбросить блок">↺</button></header>
+        <div class="meter-row"><span>RMS</span><div class="meter"><i id="omLevel"></i></div><b id="omLevelTxt">—</b></div>
+        <div class="meter-row"><span>Пик</span><div class="meter"><i id="omPeak"></i></div><b id="omPeakTxt">—</b></div>
+        <div class="meter-row"><span>Авто</span><div class="muted" id="autoGainTxt">выравнивание громкости с оригиналом</div><b id="autoGainVal">—</b></div>
+        <label class="check"><input type="checkbox" id="autoLevel" checked> Громкость как у оригинала</label>
+        <label class="check"><input type="checkbox" id="loudComp" checked> Компенсация на тихой громкости</label>
+      </section>
+    </aside>
+
+    <footer class="panel transport">
+      <div class="tp-btns">
+        <button class="ib" id="prevBtn" title="Предыдущий"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button class="ib play" id="playBtn" title="Пуск/пауза (пробел)"><svg viewBox="0 0 24 24" id="playIcon"><path d="M7 4v16l13-8z"/></svg></button>
+        <button class="ib" id="nextBtn" title="Следующий"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      </div>
+      <span class="time" id="timeCur">0:00</span>
+      <div class="seek"><div class="seek-sections" id="seekSections"></div><div class="seek-fill" id="seekFill"></div><input type="range" id="seekInput" min="0" max="1000" value="0" aria-label="Позиция"></div>
+      <span class="time" id="timeDur">0:00</span>
+      <div class="vol">
+        <svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/></svg>
+        <input type="range" class="range" id="volInput" min="0" max="100" value="80" aria-label="Громкость">
+      </div>
+    </footer>
+  </div>
+
+  <dialog class="modal" id="settings">
+    <form method="dialog">
+      <header class="panel-h"><h3>Настройки</h3><button class="btn sm" value="close">Готово</button></header>
+      <div class="set-row"><span>Тема</span><div class="seg sm" id="themeSeg"><button type="button" data-v="system">Системная</button><button type="button" data-v="dark">Тёмная</button><button type="button" data-v="light">Светлая</button></div></div>
+      <div class="set-row"><span>Акцентный цвет</span><div class="swatches" id="swatches"></div></div>
+      <div class="set-row"><span>Скругления</span><div class="seg sm" id="radiusSeg"><button type="button" data-v="2">Строгие</button><button type="button" data-v="8">Средние</button><button type="button" data-v="14">Мягкие</button></div></div>
+      <div class="set-row"><span>Плотность</span><div class="seg sm" id="densitySeg"><button type="button" data-v="compact">Компактно</button><button type="button" data-v="normal">Обычно</button></div></div>
+      <header class="panel-h set-sub"><h3>Звук</h3></header>
+      <div class="set-row"><span>Частота обработки<small class="muted" id="rateInfo"></small></span>
+        <select id="procRateSel" class="sm"><option value="auto">Авто — как у устройства</option><option value="44100">44,1 кГц</option><option value="48000">48 кГц</option><option value="88200">88,2 кГц</option><option value="96000">96 кГц</option><option value="192000">192 кГц</option></select></div>
+      <div class="set-row" id="deviceRateRow" hidden><span>Частота устройства<small class="muted" id="deviceRateName"></small></span><select id="deviceRateSel" class="sm"></select></div>
+      <header class="panel-h set-sub"><h3>Обновления</h3></header>
+      <div class="set-row"><span>Kilobuzz <b id="appVersion"></b><small class="muted" id="updStatus">Проверяется автоматически при запуске и раз в 6 часов</small></span>
+        <button type="button" class="btn sm" id="updCheck">Проверить</button></div>
+      <header class="panel-h set-sub"><h3>Интерфейс</h3></header>
+      <label class="set-row"><span>Окрашивать интерфейс в цвет секции</span><span class="toggle"><input type="checkbox" id="setSectionColor"><span></span></span></label>
+      <label class="set-row"><span>Фон реагирует на музыку</span><span class="toggle"><input type="checkbox" id="setGlow"><span></span></span></label>
+      <footer class="row between"><small class="muted">Все цвета задаются токенами в styles.css → :root</small><button type="button" class="btn sm" id="themeReset">Сбросить</button></footer>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="presetDlg">
+    <form method="dialog">
+      <header class="panel-h"><h3>Сохранить пресет</h3></header>
+      <input type="search" id="presetName" placeholder="Название, напр. «Мои наушники»" autocomplete="off" style="width:100%">
+      <footer class="row between" style="margin-top:12px"><button class="btn sm" value="cancel">Отмена</button><button class="btn sm primary" value="ok" id="presetOk">Сохранить</button></footer>
+    </form>
+  </dialog>
+
+  <div class="update-bar" id="updateBar" hidden>
+    <span id="updText"></span>
+    <button class="btn sm primary" id="updInstall">Перезапустить</button>
+    <button class="btn sm" id="updLater" title="Позже — установится при следующем запуске">Позже</button>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

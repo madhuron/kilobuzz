@@ -1,0 +1,50 @@
+# Выпуск версии: git tag vX.Y.Z && git push --tags
+# Собирает установщики для macOS и Windows и публикует их в GitHub Releases —
+# установленные копии Kilobuzz подхватывают обновление автоматически (src/main/updater.js).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Захват системного звука (Core Audio)
+        run: npm run build:native
+      - name: Сборка и публикация
+        run: npx electron-builder --mac --universal --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
+      - name: Модуль Windows (APO)
+        shell: msys2 {0}
+        run: CXX=g++ bash native/win/build.sh
+      - run: npm ci
+      - name: Сборка и публикация
+        run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

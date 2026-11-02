@@ -1,0 +1,10 @@
+# зависимости и результаты сборки
+node_modules/
+dist/
+native/bin/
+
+# системное и временное
+.DS_Store
+Thumbs.db
+*.log
+.env

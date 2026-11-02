@@ -1,0 +1,113 @@
+{
+  "name": "kilobuzz",
+  "productName": "Kilobuzz",
+  "version": "0.2.0",
+  "description": "Kilobuzz — адаптивный эквалайзер: подстраивает звук под стиль, структуру трека и ваши наушники",
+  "homepage": "https://github.com/madhuron/kilobuzz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/madhuron/kilobuzz.git"
+  },
+  "license": "MIT",
+  "author": "madhuron",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev:web": "node scripts/serve.js",
+    "dist:mac": "npm run build:native && electron-builder --mac",
+    "dist:win": "npm run build:win-native && electron-builder --win",
+    "build:native": "clang -fobjc-arc -O2 -mmacosx-version-min=14.2 -arch arm64 -arch x86_64 -framework Foundation -framework AppKit -framework CoreAudio native/mac/syscapture.m -o native/bin/kilobuzz-capture",
+    "app:mac": "npm run build:native && electron-builder --mac dir",
+    "build:win-native": "bash native/win/build.sh"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "app.kilobuzz",
+    "productName": "Kilobuzz",
+    "files": [
+      "src/main/**/*",
+      "src/renderer/index.html",
+      "src/renderer/styles.css",
+      "src/renderer/js/**/*",
+      "package.json",
+      "build/icon.png"
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAudioCaptureUsageDescription": "Kilobuzz пропускает звук приложений через адаптивный эквалайзер.",
+        "NSMicrophoneUsageDescription": "Kilobuzz обрабатывает звук, поступающий через виртуальное аудиоустройство.",
+        "NSAppleEventsUsageDescription": "Kilobuzz узнаёт, какой трек играет в Spotify и Apple Music, чтобы точнее определить стиль."
+      },
+      "identity": "-",
+      "extraResources": [
+        {
+          "from": "native/bin/kilobuzz-capture",
+          "to": "bin/kilobuzz-capture"
+        }
+      ],
+      "minimumSystemVersion": "12.0"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "native/bin/win",
+          "to": "bin",
+          "filter": [
+            "*.exe",
+            "*.dll"
+          ]
+        }
+      ]
+    },
+    "icon": "build/icon.png",
+    "directories": {
+      "output": "dist"
+    },
+    "nsis": {
+      "include": "build/installer.nsh",
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "madhuron",
+        "repo": "kilobuzz",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
+}
