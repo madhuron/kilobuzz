@@ -12,15 +12,15 @@ permissions:
   contents: write
 
 jobs:
-  # Релиз создаётся один раз заранее — иначе сборки Mac и Windows, закончив одновременно,
-  # создают каждая свой релиз с одной и той же версией.
+  # Релиз создаётся один раз заранее (черновиком) — иначе сборки Mac и Windows, закончив одновременно,
+  # создают каждая свой релиз. Публикуется он, только когда готовы обе платформы.
   release:
     runs-on: ubuntu-latest
     steps:
       - name: Создать релиз
         run: |
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "Kilobuzz ${TAG#v}" --notes "Сборка идёт…"
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --title "Kilobuzz ${TAG#v}" --notes "Сборка идёт…"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
@@ -63,3 +63,13 @@ jobs:
         run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    needs: [mac, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Опубликовать релиз
+        run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}

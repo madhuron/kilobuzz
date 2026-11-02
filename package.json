@@ -103,7 +103,7 @@
         "provider": "github",
         "owner": "madhuron",
         "repo": "kilobuzz",
-        "releaseType": "release"
+        "releaseType": "draft"
       }
     ]
   },
