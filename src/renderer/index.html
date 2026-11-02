@@ -185,7 +185,7 @@
         <select id="procRateSel" class="sm"><option value="auto">Авто — как у устройства</option><option value="44100">44,1 кГц</option><option value="48000">48 кГц</option><option value="88200">88,2 кГц</option><option value="96000">96 кГц</option><option value="192000">192 кГц</option></select></div>
       <div class="set-row" id="deviceRateRow" hidden><span>Частота устройства<small class="muted" id="deviceRateName"></small></span><select id="deviceRateSel" class="sm"></select></div>
       <header class="panel-h set-sub"><h3>Обновления</h3></header>
-      <div class="set-row"><span>Kilobuzz <b id="appVersion"></b><small class="muted" id="updStatus">Проверяется автоматически при запуске и раз в 6 часов</small></span>
+      <div class="set-row"><span>Kilobuzz <b id="appVersion"></b><small class="muted" id="updStatus">Проверяется при каждом запуске</small></span>
         <button type="button" class="btn sm" id="updCheck">Проверить</button></div>
       <header class="panel-h set-sub"><h3>Интерфейс</h3></header>
       <label class="set-row"><span>Окрашивать интерфейс в цвет секции</span><span class="toggle"><input type="checkbox" id="setSectionColor"><span></span></span></label>
@@ -202,10 +202,15 @@
     </form>
   </dialog>
 
-  <div class="update-bar" id="updateBar" hidden>
-    <span id="updText"></span>
-    <button class="btn sm primary" id="updInstall">Перезапустить</button>
-    <button class="btn sm" id="updLater" title="Позже — установится при следующем запуске">Позже</button>
+  <div class="update-card" id="updateCard" role="alertdialog" aria-labelledby="updTitle" hidden>
+    <div class="uc-head"><span class="uc-dot"></span><b id="updTitle">Доступна новая версия</b></div>
+    <p class="uc-text" id="updText"></p>
+    <div class="uc-progress" id="updProgress" hidden><div id="updBarFill"></div></div>
+    <div class="uc-actions" id="updActions">
+      <button class="btn sm" id="updLater">Позже</button>
+      <button class="btn sm primary" id="updNow">Обновиться</button>
+    </div>
+    <a href="#" class="uc-notes" id="updNotes">Что нового</a>
   </div>
   <div class="toast" id="toast"></div>
   <script type="module" src="js/app.js"></script>

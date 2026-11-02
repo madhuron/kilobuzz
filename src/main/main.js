@@ -10,6 +10,9 @@ const { SystemVolume } = require('./volume');
 const { apoStatus, apoRun, apoDiag, apoDiagFull } = require('./apo-win');
 const { binPath } = require('./capture');
 const { Updater } = require('./updater');
+
+// отдельная папка данных для тестовых копий (проверка обновлений рядом с основным Kilobuzz)
+if (process.env.KILOBUZZ_USER_DATA) app.setPath('userData', process.env.KILOBUZZ_USER_DATA);
 const { execFile } = require('child_process');
 
 app.setName('Kilobuzz');
@@ -100,7 +103,7 @@ app.whenReady().then(() => {
   ipcMain.on('capture:params', (_e, buf) => capture.sendParams(buf));
   ipcMain.handle('update:state', () => ({ ...updater.state, supported: updater.supported }));
   ipcMain.handle('update:check', () => updater.check(true));
-  ipcMain.handle('update:install', () => updater.install());
+  ipcMain.handle('update:install', () => updater.update());
   ipcMain.handle('apo:status', () => apoStatus());
   // Устройства вывода и их частоты (macOS: через нативный модуль; Windows меняет частоту в своих настройках)
   const helper = (args) => new Promise((resolve) => {

@@ -756,51 +756,73 @@ function bindRateSettings() {
 }
 
 /* ---------------- обновления (GitHub Releases) ---------------- */
-let updDismissed = '';
+// Проверка — при каждом запуске. Есть новая версия — карточка «Обновиться / Позже»;
+// «Позже» прячет её до следующего запуска (или до следующей версии).
+let updLaterFor = '';
 function renderUpdate(st) {
   if (!st) return;
   $('appVersion').textContent = st.current || '';
-  const pct = st.percent != null ? ` · ${st.percent}%` : '';
-  const text = {
-    idle: 'Проверяется автоматически при запуске и раз в 6 часов',
+  const v = st.version || '';
+  const status = {
+    idle: 'Проверяется при каждом запуске',
     checking: 'Проверяю…',
     none: 'Установлена последняя версия',
-    available: `Доступна версия ${st.version} — скачайте установщик`,
-    downloading: `Скачиваю версию ${st.version || ''}${pct}`,
-    ready: `Версия ${st.version} скачана — установится при перезапуске`,
+    available: `Доступна версия ${v}`,
+    downloading: `Скачиваю версию ${v} · ${st.percent || 0}%`,
+    ready: `Версия ${v} скачана`,
+    installing: 'Устанавливаю — Kilobuzz перезапустится',
     error: st.error || 'Не удалось проверить обновления',
   }[st.state] || '';
-  $('updStatus').textContent = st.supported === false && st.state === 'idle' ? 'Обновления работают в установленном приложении' : text;
-  $('updCheck').textContent = st.state === 'ready' || st.state === 'available' ? 'Установить' : 'Проверить';
-  $('updCheck').disabled = st.state === 'checking' || st.state === 'downloading';
-  const show = (st.state === 'ready' || st.state === 'available') && updDismissed !== st.version;
-  $('updateBar').hidden = !show;
+  $('updStatus').textContent = st.supported === false && st.state === 'idle' ? 'Обновления работают в установленном приложении' : status;
+  const canUpdate = st.state === 'available' || st.state === 'ready' || (st.state === 'error' && v);
+  $('updCheck').textContent = canUpdate ? 'Обновиться' : 'Проверить';
+  $('updCheck').disabled = ['checking', 'downloading', 'installing'].includes(st.state);
+
+  // карточка-уведомление
+  const busy = st.state === 'downloading' || st.state === 'installing' || st.state === 'ready';
+  const show = v && (busy || ((st.state === 'available' || st.state === 'error') && updLaterFor !== v));
+  $('updateCard').hidden = !show;
   if (show) {
-    $('updText').textContent = st.state === 'ready' ? `Kilobuzz ${st.version} готов к установке` : `Вышел Kilobuzz ${st.version}`;
-    $('updInstall').textContent = st.state === 'ready' ? 'Перезапустить' : 'Скачать';
+    const first = String(st.notes || '').split('\n').map((x) => x.replace(/^[#>*\-\s]+/, '').replace(/\*\*/g, '').trim()).find((x) => x && !/^(исправлено|что нового)/i.test(x)) || '';
+    $('updTitle').textContent = st.state === 'error' ? 'Обновление не скачалось' : st.state === 'installing' ? `Устанавливаю Kilobuzz ${v}` : `Доступен Kilobuzz ${v}`;
+    $('updText').textContent = st.state === 'downloading' ? `Скачиваю… ${st.percent || 0}%`
+      : st.state === 'installing' || st.state === 'ready' ? 'Kilobuzz закроется и сразу откроется новой версией.'
+      : st.state === 'error' ? `${st.error}. Попробуйте ещё раз.`
+      : `У вас ${st.current}.${first ? ' ' + (first.length > 140 ? first.slice(0, 137) + '…' : first) : ''}`;
+    $('updProgress').hidden = st.state !== 'downloading';
+    $('updBarFill').style.width = `${st.percent || 0}%`;
+    $('updActions').hidden = busy;
+    $('updNow').textContent = st.state === 'error' ? 'Повторить' : st.manualUrl ? 'Скачать' : 'Обновиться';
+    $('updNotes').hidden = !st.url;
   }
   if (st.manual && st.state === 'none') toast('Установлена последняя версия');
-  if (st.manual && st.state === 'error') toast(st.error || 'Не удалось проверить обновления');
+  if (st.manual && st.state === 'error' && !v) toast(st.error || 'Не удалось проверить обновления');
 }
 
-async function installUpdate() {
-  const st = await bridge.updateState?.();
-  if (st?.state === 'available' && st.manualUrl) return bridge.openExternal(st.manualUrl);
-  if (st?.state !== 'ready') return bridge.checkUpdate();
+async function updateNow() {
+  // перед перезапуском — остановить захват звука, чтобы macOS/Windows сразу вернули обычный звук
   if (state.capture?.running) await stopSystem().catch(() => {});
   const ok = await bridge.installUpdate();
-  if (!ok) toast('Не получилось заменить приложение — открываю установщик', 5000);
+  const st = await bridge.updateState();
+  if (!ok && st?.manualUrl) toast('Открываю страницу загрузки — установите новую версию вручную', 5000);
+  else if (!ok && st?.state === 'ready') toast('Не получилось заменить приложение — открываю установщик', 5000);
 }
 
 function bindUpdates() {
   if (!bridge.updateState) return;
   bridge.onUpdateState(renderUpdate);
   bridge.updateState().then(renderUpdate);
-  $('updCheck').onclick = () => ($('updCheck').textContent === 'Установить' ? installUpdate() : bridge.checkUpdate());
-  $('updInstall').onclick = installUpdate;
+  $('updCheck').onclick = () => ($('updCheck').textContent === 'Обновиться' ? updateNow() : bridge.checkUpdate());
+  $('updNow').onclick = updateNow;
   $('updLater').onclick = async () => {
-    updDismissed = (await bridge.updateState())?.version || '';
-    $('updateBar').hidden = true;
+    updLaterFor = (await bridge.updateState())?.version || '';
+    $('updateCard').hidden = true;
+    toast('Напомню при следующем запуске. Обновиться можно в настройках → «Обновления»', 4500);
+  };
+  $('updNotes').onclick = async (e) => {
+    e.preventDefault();
+    const st = await bridge.updateState();
+    if (st?.url) bridge.openExternal(st.url);
   };
 }
 

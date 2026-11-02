@@ -1,7 +1,7 @@
 {
   "name": "kilobuzz",
   "productName": "Kilobuzz",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Kilobuzz — адаптивный эквалайзер: подстраивает звук под стиль, структуру трека и ваши наушники",
   "homepage": "https://github.com/madhuron/kilobuzz",
   "repository": {

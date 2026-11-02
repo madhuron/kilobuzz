@@ -7,11 +7,13 @@ const { execFile, spawn } = require('child_process');
 
 /**
  * Обновления через GitHub Releases (репозиторий — поле "repository" в package.json).
- *  Windows: electron-updater — скачивает установщик в фоне, ставит при перезапуске (без прав администратора).
+ * Проверка — при каждом запуске (и раз в 6 часов, пока приложение открыто). Найдена новая версия —
+ * интерфейс показывает уведомление «Обновиться / Позже»; скачивание и установка — только по согласию.
+ *  Windows: electron-updater — скачивает установщик и ставит его тихо, без прав администратора.
  *  macOS: стандартный механизм (Squirrel) требует платной подписи Apple, поэтому свой: скачиваем
- *         Kilobuzz-<версия>-universal-mac.zip, распаковываем и при перезапуске заменяем Kilobuzz.app на месте.
+ *         Kilobuzz-<версия>-universal-mac.zip, распаковываем и заменяем Kilobuzz.app на месте.
  *         Если папку приложения нельзя перезаписать — открываем .dmg для ручной установки.
- * Состояния для интерфейса: idle | checking | none | available | downloading | ready | error.
+ * Состояния для интерфейса: idle | checking | none | available | downloading | ready | installing | error.
  */
 class Updater extends EventEmitter {
   constructor() {
@@ -28,10 +30,10 @@ class Updater extends EventEmitter {
     return app.isPackaged && !!this.repo && (process.platform === 'win32' || process.platform === 'darwin');
   }
 
-  /** Проверять при запуске и каждые 6 часов. */
+  /** Проверять при каждом запуске (как только окно готово) и каждые 6 часов. */
   start() {
     if (!this.supported) return;
-    setTimeout(() => this.check(), 15000);
+    setTimeout(() => this.check(), 3000);
     this.timer = setInterval(() => this.check(), 6 * 3600 * 1000);
   }
 
@@ -44,7 +46,7 @@ class Updater extends EventEmitter {
 
   async check(manual = false) {
     if (!this.supported) return this._set({ state: 'error', error: app.isPackaged ? 'Не указан репозиторий' : 'Обновления работают только в установленном приложении' });
-    if (['checking', 'downloading', 'ready'].includes(this.state.state)) return this.state;
+    if (['checking', 'available', 'downloading', 'ready', 'installing'].includes(this.state.state)) return this.state;
     this._set({ state: 'checking', manual, error: null });
     try {
       if (process.platform === 'win32') await this.win.checkForUpdates();
@@ -55,11 +57,30 @@ class Updater extends EventEmitter {
     return this.state;
   }
 
-  install() {
+  /** «Обновиться»: скачать (если ещё не скачано) и сразу установить с перезапуском. */
+  async update() {
+    const st = this.state.state;
+    if (st === 'ready') return this._install();
+    if (st !== 'available' && st !== 'error') return false;
+    if (this.state.manualUrl) { shell.openExternal(this.state.manualUrl); return false; }
+    if (!this.state.version) return false;  // ошибка была ещё при проверке
+    this._set({ state: 'downloading', percent: 0, error: null });
+    try {
+      if (process.platform === 'win32') await this.win.downloadUpdate();
+      else await this._downloadMac();
+    } catch (e) {
+      this._set({ state: 'error', error: friendly(e) });
+      return false;
+    }
+    return this._install();
+  }
+
+  _install() {
     if (this.state.state !== 'ready') return false;
+    this._set({ state: 'installing' });
     if (process.platform === 'win32') {
       // тихая установка поверх и запуск новой версии
-      setImmediate(() => this.win.quitAndInstall(true, true));
+      setTimeout(() => this.win.quitAndInstall(true, true), 600);
       return true;
     }
     return this._installMac();
@@ -69,15 +90,17 @@ class Updater extends EventEmitter {
   _initWin() {
     const { autoUpdater } = require('electron-updater');
     this.win = autoUpdater;
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoDownload = false;          // только после «Обновиться»
+    autoUpdater.autoInstallOnAppQuit = false;  // «Позже» — значит не ставить без спроса
     autoUpdater.logger = null;
-    autoUpdater.on('update-available', (i) => this._set({ state: 'downloading', version: i.version, notes: notesText(i.releaseNotes), percent: 0 }));
+    autoUpdater.on('update-available', (i) => this._set({ state: 'available', version: i.version, notes: notesText(i.releaseNotes), url: this._releaseUrl(i.version) }));
     autoUpdater.on('update-not-available', () => this._set({ state: 'none' }));
     autoUpdater.on('download-progress', (p) => this._set({ state: 'downloading', percent: Math.round(p.percent) }));
-    autoUpdater.on('update-downloaded', (i) => this._set({ state: 'ready', version: i.version }));
-    autoUpdater.on('error', (e) => this._set({ state: 'error', error: friendly(e) }));
+    autoUpdater.on('update-downloaded', () => this._set({ state: 'ready' }));
+    autoUpdater.on('error', () => {});  // ошибки ловятся в check()/update(); без слушателя событие 'error' роняет процесс
   }
+
+  _releaseUrl(version) { return `https://github.com/${this.repo}/releases/tag/v${version}`; }
 
   /* ---------------- macOS ---------------- */
   async _checkMac() {
@@ -87,9 +110,12 @@ class Updater extends EventEmitter {
     const zip = rel.assets.find((a) => /mac\.zip$/i.test(a.name) && /universal/i.test(a.name)) || rel.assets.find((a) => /mac\.zip$/i.test(a.name));
     const dmg = rel.assets.find((a) => /\.dmg$/i.test(a.name));
     this.macDmgUrl = dmg?.browser_download_url || rel.html_url;
-    const notes = String(rel.body || '').trim();
-    if (!zip) return this._set({ state: 'available', version, notes, manualUrl: this.macDmgUrl });
-    this._set({ state: 'downloading', version, notes, percent: 0 });
+    this.macZip = zip;
+    this._set({ state: 'available', version, notes: String(rel.body || '').trim(), url: rel.html_url, manualUrl: zip ? '' : this.macDmgUrl });
+  }
+
+  async _downloadMac() {
+    const zip = this.macZip;
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilobuzz-update-'));
     const file = path.join(dir, zip.name);
     await download(zip.browser_download_url, file, zip.size, (percent) => this._set({ percent }));
@@ -99,7 +125,7 @@ class Updater extends EventEmitter {
     // скачано самим приложением — снимаем карантин, чтобы macOS не спрашивала про «скачано из интернета»
     await run('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', appPath]).catch(() => {});
     this.macApp = appPath;
-    this._set({ state: 'ready', version });
+    this._set({ state: 'ready' });
   }
 
   _installMac() {
