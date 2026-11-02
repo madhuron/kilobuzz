@@ -212,7 +212,10 @@ int main(int argc, const char *argv[]) {
     gDesc.name = @"Kilobuzz";
     gDesc.privateTap = YES;
     gDesc.muteBehavior = CATapMutedWhenTapped;
-    if (@available(macOS 26.0, *)) gDesc.bundleIDs = ownBundleIDs();
+    // bundleIDs появилось в macOS 26 SDK; через KVC код собирается и со старыми SDK
+    if (@available(macOS 26.0, *)) {
+      if ([gDesc respondsToSelector:NSSelectorFromString(@"setBundleIDs:")]) [gDesc setValue:ownBundleIDs() forKey:@"bundleIDs"];
+    }
     OSStatus st = AudioHardwareCreateProcessTap(gDesc, &gTapID);
     if (st != noErr) fail(@"Не удалось создать захват системного звука", st);
 
