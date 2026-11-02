@@ -16,7 +16,7 @@
     "dev:web": "node scripts/serve.js",
     "dist:mac": "npm run build:native && electron-builder --mac",
     "dist:win": "npm run build:win-native && electron-builder --win",
-    "build:native": "clang -fobjc-arc -O2 -mmacosx-version-min=14.2 -arch arm64 -arch x86_64 -framework Foundation -framework AppKit -framework CoreAudio native/mac/syscapture.m -o native/bin/kilobuzz-capture",
+    "build:native": "mkdir -p native/bin && clang -fobjc-arc -O2 -mmacosx-version-min=14.2 -arch arm64 -arch x86_64 -framework Foundation -framework AppKit -framework CoreAudio native/mac/syscapture.m -o native/bin/kilobuzz-capture",
     "app:mac": "npm run build:native && electron-builder --mac dir",
     "build:win-native": "bash native/win/build.sh"
   },
